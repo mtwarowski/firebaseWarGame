@@ -1,0 +1,32 @@
+.wrapper{
+  display: flex;
+}
+
+.scoreContainar{
+    flex: 1;
+    height: 100%;
+    margin: 0px;
+    padding: 0px;
+    float:left;
+    background-color: red;
+}
+
+.battleFieldContainar{
+    flex: 10;
+    height: 100%;
+    margin: 0px;
+    padding: 0px;
+    background-color: black;
+    float:left;
+}
+
+.battleField{
+    width: 100%;
+    height: 100%;
+}
+
+
+.scores{
+    width: 100%;
+    height: 100%;
+}
