@@ -22,6 +22,7 @@ import { firebaseConfig } from "./firebase.config";
 
 const appRoutes: Routes = [
   { path: 'game', component: GameComponent, canActivate: [ LoggedInGuard ] },
+  // { path: 'battlefield', component: BattlefieldComponent, canActivate: [ LoggedInGuard ] },
   { path: 'login', component: LoginComponent },
   { path: '',   redirectTo: '/game', pathMatch: 'full' }
 ];

@@ -1,16 +1,7 @@
-import { Component, OnInit, AfterViewInit, HostListener, Injectable, Pipe, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, HostListener, Injectable, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { AngularFireDatabase, FirebaseListObservable, FirebaseObjectObservable } from "angularfire2/database";
 import { UserService } from "../user.service";
-import { key_S, key_W, key_A, key_D, WAR_MACHINES_RES, SETTINGS_RES } from "../global.constants";
-
-export enum GameAction{
-  MoveForeward,
-  MoveBack,
-  RotateLeft,
-  RotateRight,
-  // Shoot,
-}
-
+import { key_S, key_W, key_A, key_D, WAR_MACHINES_RES, SETTINGS_RES, key_Space } from "../global.constants";
 
 @Component({
   selector: 'app-game',
@@ -24,22 +15,27 @@ export class GameComponent implements OnInit {
 
   ngOnInit() {
   }
-}   
-// <svg width="1000" height="1000">
-//   <circle *ngFor="let currentWarMachine of warMachinesObservable | async"  [attr.cx]="currentWarMachine.xpos" [attr.cy]="currentWarMachine.ypos" r="10" stroke="green" stroke-width="4" fill="yellow" />
-// </svg>
+}
 
 @Component({
   selector: 'app-battlefield',
-  template: ` 
-  <button *ngIf="!playerWarMachineObservable" (click)="addNewWarMachine()">Game on!</button>
-  <canvas *ngIf="playerWarMachineObservable" class="gameField" #gameCanvas></canvas>
+  template: `
+  <div class="battefieldWrapper" #battefieldWrapper>
+    <button *ngIf="!playerWarMachineObservable" (click)="addNewWarMachine()">Game on!</button>
+    <canvas *ngIf="playerWarMachineObservable" class="gameCanvas" #gameCanvas></canvas>
+  </div>
   `,
   styles:[`
-    .gameField{
-      overflow: hidden;
-      width: 100%;
+    .battefieldWrapper{
+      width:100%;
       height: 100%;
+      overflow: hidden;
+      background-color: azure;
+    }
+
+    .gameCanvas{
+      overflow: hidden;
+      background-color: blue;
     }
   `]
 })
@@ -56,11 +52,21 @@ export class BattlefieldComponent {
 
   private gameControlBuffor: IGameControlBuffor = <IGameControlBuffor>{};
 
-  @ViewChild('gameCanvas') gameCanvasViewChild;
-  gameCanvas: HTMLCanvasElement;
+  @ViewChild('battefieldWrapper') battefieldWrapperViewChild;
+  //@ViewChild('gameCanvas') gameCanvasViewChild;
+
+  private gameCanvasViewChild: ElementRef;
+  @ViewChild('gameCanvas') set content(content: ElementRef) {
+    this.gameCanvasViewChild = content;
+
+    if(this.gameCanvasViewChild && this.gameCanvasViewChild.nativeElement){
+      this.fitGameCanvasToWrapper(this.gameCanvasViewChild.nativeElement, this.battefieldWrapperViewChild.nativeElement);
+    }
+  };
+  private gameCanvas: HTMLCanvasElement;
   
-  xTrans = 20; 
-  yTrans = 20;
+  private xTrans: number = 20; 
+  private yTrans: number = 20;
 
   constructor(public af: AngularFireDatabase) {
     this.gameControlBuffor.MoveForeward = false;
@@ -88,6 +94,7 @@ export class BattlefieldComponent {
         } , this.settings.GAME_TICK_SPEED);
     });
   }
+  
 
   battleFieldClock: GameClock;
   timer: any;
@@ -95,11 +102,12 @@ export class BattlefieldComponent {
     this.warMachine = <IWarMachine>{ xpos: 50, ypos: 50, angle: 0 }; 
     var createdKey = this.warMachinesObservable.push(this.warMachine).key;
 
-    
-      this.playerWarMachineObservable = this.af.object(WAR_MACHINES_RES + createdKey);
-      this.playerWarMachineObservable.subscribe((value: IWarMachine) => {
-        this.warMachine = value;
-      });
+    this.playerWarMachineObservable = this.af.object(WAR_MACHINES_RES + createdKey);
+    this.playerWarMachineObservable.subscribe((value: IWarMachine) => {
+      this.warMachine = value;
+    });
+  
+    this.onResize({});
   }
 
   updateWarMachine(newDataWarMachine: IWarMachine){
@@ -109,10 +117,9 @@ export class BattlefieldComponent {
   }
   
   battlefieldTick(){
-    if(!this.gameCanvasViewChild){
+    if(!this.gameCanvasViewChild || !this.battefieldWrapperViewChild){
       return;
     }
-
     this.gameCanvas = this.gameCanvasViewChild.nativeElement;
 
     this.updatePlayerWarMachinePosition();
@@ -120,7 +127,6 @@ export class BattlefieldComponent {
     let ctx=this.getCleanContext();
     ctx.save();
     this.setViewport(this.gameCanvas, ctx);
-
     this.drawBattleFieldBoundries(ctx);
     this.drawWarMachines(ctx);
     ctx.restore();
@@ -163,20 +169,32 @@ export class BattlefieldComponent {
   }
 
   setViewport(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
+    let biggerDimention = canvas.width > canvas.height ? canvas.width : canvas.height;
+    biggerDimention *= 0.1;
+
+    // this.xTrans = this.xTrans > this.warMachine.xpos ? this.warMachine.xpos : this.xTrans;
+    // this.yTrans = this.yTrans > this.warMachine.ypos ? this.warMachine.ypos : this.yTrans;
+
+    // //move viewport up if need top 
+    if(biggerDimention > this.warMachine.xpos - this.xTrans){
+      this.xTrans = this.warMachine.xpos - biggerDimention;
+    }
     
-    // //move viewport up if need to or left
-    this.xTrans = this.xTrans > this.warMachine.xpos ? this.warMachine.xpos : this.xTrans;
-    this.yTrans = this.yTrans > this.warMachine.ypos ? this.warMachine.ypos : this.yTrans;
+    // //move viewport up if need left
+    if(biggerDimention > this.warMachine.ypos - this.yTrans){
+      this.yTrans = this.warMachine.ypos - biggerDimention;
+    }
 
-    //player off screen to low
-    if(canvas.width < this.warMachine.xpos - this.xTrans){
-      this.xTrans = this.warMachine.xpos - canvas.width;
+    //player off screen to right
+    if(canvas.width - biggerDimention < this.warMachine.xpos - this.xTrans){
+      this.xTrans = this.warMachine.xpos - canvas.width + biggerDimention;
     }
 
     //player off screen to low
-    if(canvas.height < this.warMachine.ypos - this.yTrans){
-      this.yTrans = this.warMachine.ypos - canvas.height;
+    if(canvas.height - biggerDimention < this.warMachine.ypos - this.yTrans){
+      this.yTrans = this.warMachine.ypos - canvas.height + biggerDimention;
     }
+
     ctx.translate(-this.xTrans, -this.yTrans);
   }
 
@@ -218,6 +236,36 @@ export class BattlefieldComponent {
   }
 
 
+  resizeTimer: any;
+  @HostListener('window:resize', ['$event'])
+  onResize(event) {
+    if(!this.gameCanvasViewChild || !this.battefieldWrapperViewChild){
+      return;
+    }
+    this.gameCanvas = this.gameCanvasViewChild.nativeElement;
+    let battlefieldWrapper = this.battefieldWrapperViewChild.nativeElement;
+    this.gameCanvas.width = 0;
+    this.gameCanvas.height = 0;
+
+    if(this.resizeTimer){
+      clearTimeout(this.resizeTimer);
+    }    
+    this.resizeTimer = setTimeout(() => {    
+      this.fitGameCanvasToWrapper(this.gameCanvas, battlefieldWrapper);
+    }, 50);
+  }
+
+  fitGameCanvasToWrapper(canvas: HTMLCanvasElement, battlefieldWrapper: HTMLDivElement){
+      //fitting canvas to take full size
+      if(battlefieldWrapper.offsetWidth != canvas.width){
+        canvas.width = battlefieldWrapper.offsetWidth;
+      }
+      
+      if(battlefieldWrapper.offsetHeight != canvas.height){
+        canvas.height = battlefieldWrapper.offsetHeight;
+      }
+  }
+
   @HostListener('window:keydown', ['$event'])
   keydown(event: KeyboardEvent) {
 
@@ -235,6 +283,14 @@ export class BattlefieldComponent {
 
     if(event.keyCode == key_D){
       this.gameControlBuffor.RotateRight = true;
+    }
+    
+    if(event.keyCode == key_D){
+      this.gameControlBuffor.RotateRight = true;
+    }
+
+    if(event.keyCode == key_Space){
+      this.gameControlBuffor.Shoot = true;
     }
   }
 
@@ -254,8 +310,8 @@ export class BattlefieldComponent {
       this.gameControlBuffor.RotateLeft = false;
     }
 
-    if(event.keyCode == key_D){
-      this.gameControlBuffor.RotateRight = false;
+    if(event.keyCode == key_Space){
+      this.gameControlBuffor.Shoot = false;
     }
   }
 
@@ -321,6 +377,7 @@ export interface IGameControlBuffor{
   MoveBack: boolean;
   RotateLeft: boolean;
   RotateRight: boolean;
+  Shoot: boolean;
 }
 
 export interface IGameSettings{
@@ -332,4 +389,5 @@ export interface IGameSettings{
   GAME_BATTLEFIELD_HEIGHT: number;
   GAME_BATTLEFIELD_LINE_WIDTH: number;
   GAME_BATTLEFIELD_WAR_MACHINE_SIZE: number;
+  GAME_BATTLEFIELD_BULLET_SIZE: number;
 }
