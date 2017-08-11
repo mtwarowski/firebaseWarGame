@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener, Injectable, Pipe } from '@angular/core';
+import { Component, OnInit, AfterViewInit, HostListener, Injectable, Pipe, ViewChild } from '@angular/core';
 import { AngularFireDatabase, FirebaseListObservable, FirebaseObjectObservable } from "angularfire2/database";
 import { UserService } from "../user.service";
 import { key_S, key_W, key_A, key_D, WAR_MACHINES_RES, SETTINGS_RES } from "../global.constants";
@@ -24,20 +24,16 @@ export class GameComponent implements OnInit {
 
   ngOnInit() {
   }
-}
-
+}   
+// <svg width="1000" height="1000">
+//   <circle *ngFor="let currentWarMachine of warMachinesObservable | async"  [attr.cx]="currentWarMachine.xpos" [attr.cy]="currentWarMachine.ypos" r="10" stroke="green" stroke-width="4" fill="yellow" />
+// </svg>
 
 @Component({
   selector: 'app-battlefield',
   template: ` 
   <button *ngIf="!playerWarMachineObservable" (click)="addNewWarMachine()">Game on!</button>
-  <div *ngIf="playerWarMachineObservable">
-    <svg width="1000" height="1000">
-      <circle *ngFor="let currentWarMachine of warMachinesObservable | async"  [attr.cx]="currentWarMachine.xpos" [attr.cy]="currentWarMachine.ypos" r="10" stroke="green" stroke-width="4" fill="yellow" />
-    </svg>
-
-    <canvas class="gameField"></canvas>
-  </div>
+  <canvas *ngIf="playerWarMachineObservable" class="gameField" #gameCanvas></canvas>
   `,
   styles:[`
     .gameField{
@@ -48,12 +44,23 @@ export class GameComponent implements OnInit {
   `]
 })
 export class BattlefieldComponent {
-  public warMachinesObservable: FirebaseListObservable<WarMachine[]>;
-  public playerWarMachineObservable: FirebaseObjectObservable<WarMachine>;
-  public settingsObservable: FirebaseObjectObservable<IGameSettings>;
-  public warMachine: WarMachine;
-  private gameControlBuffor: IGameControlBuffor = <IGameControlBuffor>{};
+
+  public warMachines: IWarMachine[];
+  public warMachinesObservable: FirebaseListObservable<IWarMachine[]>;
+
+  public warMachine: IWarMachine;
+  public playerWarMachineObservable: FirebaseObjectObservable<IWarMachine>;
+
   private settings: IGameSettings;
+  public settingsObservable: FirebaseObjectObservable<IGameSettings>;
+
+  private gameControlBuffor: IGameControlBuffor = <IGameControlBuffor>{};
+
+  @ViewChild('gameCanvas') gameCanvasViewChild;
+  gameCanvas: HTMLCanvasElement;
+  
+  xTrans = 20; 
+  yTrans = 20;
 
   constructor(public af: AngularFireDatabase) {
     this.gameControlBuffor.MoveForeward = false;
@@ -61,9 +68,11 @@ export class BattlefieldComponent {
     this.gameControlBuffor.RotateLeft = false;
     this.gameControlBuffor.RotateRight = false;
     this.warMachinesObservable = this.af.list(WAR_MACHINES_RES);
+    this.warMachinesObservable.subscribe(newWarMachines => {
+      this.warMachines = newWarMachines;
+    });
+
     this.settingsObservable = this.af.object(SETTINGS_RES);
-
-
     this.settingsObservable.subscribe(newSettings => {
         this.battleFieldClock = new GameClock();
         this.settings = newSettings;
@@ -83,29 +92,92 @@ export class BattlefieldComponent {
   battleFieldClock: GameClock;
   timer: any;
   addNewWarMachine(){
-    this.warMachine = <WarMachine>{ xpos: 50, ypos: 50, angle: 0 }; 
+    this.warMachine = <IWarMachine>{ xpos: 50, ypos: 50, angle: 0 }; 
     var createdKey = this.warMachinesObservable.push(this.warMachine).key;
 
     
       this.playerWarMachineObservable = this.af.object(WAR_MACHINES_RES + createdKey);
-      this.playerWarMachineObservable.subscribe((value: WarMachine) => {
+      this.playerWarMachineObservable.subscribe((value: IWarMachine) => {
         this.warMachine = value;
       });
   }
 
-  updateWarMachine(newDataWarMachine: WarMachine){
+  updateWarMachine(newDataWarMachine: IWarMachine){
     if(this.playerWarMachineObservable){
       this.playerWarMachineObservable.update(newDataWarMachine);
     }
   }
   
   battlefieldTick(){
-    this.drawBattleFieldBoundries();
+    if(!this.gameCanvasViewChild){
+      return;
+    }
+
+    this.gameCanvas = this.gameCanvasViewChild.nativeElement;
+
     this.updatePlayerWarMachinePosition();
+    
+    let ctx=this.getCleanContext();
+    ctx.save();
+    this.setViewport(this.gameCanvas, ctx);
+
+    this.drawBattleFieldBoundries(ctx);
+    this.drawWarMachines(ctx);
+    ctx.restore();
   }
 
-  drawBattleFieldBoundries(){
+  getCleanContext(): CanvasRenderingContext2D{
+    let ctx=this.gameCanvas.getContext("2d");
+    ctx.clearRect(0,0,this.settings.GAME_BATTLEFIELD_WIDTH, this.settings.GAME_BATTLEFIELD_HEIGHT);
+    return ctx;
+  }
 
+  drawBattleFieldBoundries(ctx: CanvasRenderingContext2D){
+
+    ctx.strokeStyle="#FF0000";
+    ctx.lineWidth = this.settings.GAME_BATTLEFIELD_LINE_WIDTH;
+    ctx.strokeRect(0,0,this.settings.GAME_BATTLEFIELD_WIDTH, this.settings.GAME_BATTLEFIELD_HEIGHT);
+    ctx.closePath();
+  }
+
+  drawWarMachines(ctx: CanvasRenderingContext2D){
+    if(!this.warMachines){
+      return;
+    }
+
+    this.warMachines.forEach(currentWarMachine => {      
+      ctx.beginPath();
+      ctx.arc(currentWarMachine.xpos, currentWarMachine.ypos, this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE, 0, 2 * Math.PI, false);
+      ctx.fillStyle = 'green';
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#003300';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(currentWarMachine.xpos, currentWarMachine.ypos);
+      let vector = Vector2d.getVectorFromDistanceAndAngle(this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE, currentWarMachine.angle);
+      ctx.lineTo(currentWarMachine.xpos + vector.x, currentWarMachine.ypos + vector.y);
+      ctx.stroke();
+    });
+  }
+
+  setViewport(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
+    
+    // //move viewport up if need to or left
+    this.xTrans = this.xTrans > this.warMachine.xpos ? this.warMachine.xpos : this.xTrans;
+    this.yTrans = this.yTrans > this.warMachine.ypos ? this.warMachine.ypos : this.yTrans;
+
+    //player off screen to low
+    if(canvas.width < this.warMachine.xpos - this.xTrans){
+      this.xTrans = this.warMachine.xpos - canvas.width;
+    }
+
+    //player off screen to low
+    if(canvas.height < this.warMachine.ypos - this.yTrans){
+      this.yTrans = this.warMachine.ypos - canvas.height;
+    }
+    ctx.translate(-this.xTrans, -this.yTrans);
   }
 
   updatePlayerWarMachinePosition() {
@@ -197,7 +269,7 @@ export class BattlefieldComponent {
   // }
 }
 
-export interface WarMachine{
+export interface IWarMachine{
   $key: string;
   xpos: number;
   ypos: number;
@@ -255,6 +327,9 @@ export interface IGameSettings{
   GAME_TICK_SPEED: number;
   GAME_MOVE_SPEED: number;
   GAME_ROTATE_SPEED: number;
+
   GAME_BATTLEFIELD_WIDTH: number;
   GAME_BATTLEFIELD_HEIGHT: number;
+  GAME_BATTLEFIELD_LINE_WIDTH: number;
+  GAME_BATTLEFIELD_WAR_MACHINE_SIZE: number;
 }
