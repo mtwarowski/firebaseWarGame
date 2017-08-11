@@ -17,6 +17,7 @@ import { GameComponent, BattlefieldComponent } from './game/game.component';
 import { ScoreComponent } from './game/score.component';
 import { LoginComponent } from "./login/login.component";
 import { UserService } from "./user.service";
+import { firebaseConfig } from "./firebase.config";
 
 
 const appRoutes: Routes = [
@@ -25,10 +26,6 @@ const appRoutes: Routes = [
   { path: '',   redirectTo: '/game', pathMatch: 'full' }
 ];
 
-// Must export the config
-export const firebaseConfig = {
-
-};
 @NgModule({
   imports: [
     RouterModule.forRoot(appRoutes),
