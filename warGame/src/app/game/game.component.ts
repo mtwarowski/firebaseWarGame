@@ -212,11 +212,11 @@ export class BattlefieldComponent {
     //process Rotation
     let rotationDirection = 0;
     if(this.gameControlBuffor.RotateLeft && !this.gameControlBuffor.RotateRight){
-      rotationDirection = -1;
+      rotationDirection = 1;
     }
 
     if(!this.gameControlBuffor.RotateLeft && this.gameControlBuffor.RotateRight){
-      rotationDirection = 1;
+      rotationDirection = -1;
     }
     this.warMachine.angle += ( distance * this.settings.GAME_ROTATE_SPEED * rotationDirection);
 
