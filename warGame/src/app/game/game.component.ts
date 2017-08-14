@@ -99,7 +99,11 @@ export class BattlefieldComponent {
   battleFieldClock: GameClock;
   timer: any;
   addNewWarMachine(){
-    this.warMachine = <IWarMachine>{ xpos: 50, ypos: 50, angle: 0 }; 
+    this.warMachine = <IWarMachine>{ 
+      xpos: this.getRandon(this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE, this.settings.GAME_BATTLEFIELD_WIDTH), 
+      ypos: this.getRandon(this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE, this.settings.GAME_BATTLEFIELD_HEIGHT), 
+      angle: this.getRandon(0, 360)
+    }; 
     var createdKey = this.warMachinesObservable.push(this.warMachine).key;
 
     this.playerWarMachineObservable = this.af.object(WAR_MACHINES_RES + createdKey);
@@ -232,6 +236,22 @@ export class BattlefieldComponent {
     this.warMachine.xpos += vector.x;
     this.warMachine.ypos += vector.y;
 
+    if(this.warMachine.xpos - this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE <= 0){
+      this.warMachine.xpos = this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE;
+    }
+    
+    if(this.warMachine.xpos + this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE >= this.settings.GAME_BATTLEFIELD_WIDTH){
+      this.warMachine.xpos = this.settings.GAME_BATTLEFIELD_WIDTH - this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE;
+    }
+
+    if(this.warMachine.ypos - this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE <= 0){
+      this.warMachine.ypos = this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE;
+    }
+    
+    if(this.warMachine.ypos + this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE >= this.settings.GAME_BATTLEFIELD_HEIGHT){
+      this.warMachine.ypos = this.settings.GAME_BATTLEFIELD_HEIGHT - this.settings.GAME_BATTLEFIELD_WAR_MACHINE_SIZE;
+    }
+
     this.updateWarMachine(this.warMachine);
   }
 
@@ -280,10 +300,6 @@ export class BattlefieldComponent {
     if(event.keyCode == key_A){
       this.gameControlBuffor.RotateLeft = true;
     }
-
-    if(event.keyCode == key_D){
-      this.gameControlBuffor.RotateRight = true;
-    }
     
     if(event.keyCode == key_D){
       this.gameControlBuffor.RotateRight = true;
@@ -310,6 +326,10 @@ export class BattlefieldComponent {
       this.gameControlBuffor.RotateLeft = false;
     }
 
+    if(event.keyCode == key_D){
+      this.gameControlBuffor.RotateRight = false;
+    }
+
     if(event.keyCode == key_Space){
       this.gameControlBuffor.Shoot = false;
     }
@@ -323,6 +343,10 @@ export class BattlefieldComponent {
   // @HostListener('window:mousemove', ['$event'])
   // mouseMove(event){
   // }
+
+  private getRandon(min: number, max: number): number {
+    return Math.floor(Math.random() * max) + min;
+  }
 }
 
 export interface IWarMachine{
