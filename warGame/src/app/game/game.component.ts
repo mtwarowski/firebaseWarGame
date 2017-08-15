@@ -138,7 +138,8 @@ export class BattlefieldComponent {
 
   getCleanContext(): CanvasRenderingContext2D{
     let ctx=this.gameCanvas.getContext("2d");
-    ctx.clearRect(0,0,this.settings.GAME_BATTLEFIELD_WIDTH, this.settings.GAME_BATTLEFIELD_HEIGHT);
+    //ctx.clearRect(0,0,this.settings.GAME_BATTLEFIELD_WIDTH, this.settings.GAME_BATTLEFIELD_HEIGHT);
+    ctx.clearRect(0, 0, this.gameCanvas.width+this.xTrans, this.gameCanvas.height+this.yTrans);
     return ctx;
   }
 
