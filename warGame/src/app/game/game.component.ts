@@ -53,8 +53,6 @@ export class BattlefieldComponent {
   private gameControlBuffor: IGameControlBuffor = <IGameControlBuffor>{};
 
   @ViewChild('battefieldWrapper') battefieldWrapperViewChild;
-  //@ViewChild('gameCanvas') gameCanvasViewChild;
-
   private gameCanvasViewChild: ElementRef;
   @ViewChild('gameCanvas') set content(content: ElementRef) {
     this.gameCanvasViewChild = content;
@@ -63,10 +61,9 @@ export class BattlefieldComponent {
       this.fitGameCanvasToWrapper(this.gameCanvasViewChild.nativeElement, this.battefieldWrapperViewChild.nativeElement);
     }
   };
-  private gameCanvas: HTMLCanvasElement;
   
-  private xTrans: number = 20; 
-  private yTrans: number = 20;
+  private xTrans: number = 0;
+  private yTrans: number = 2;
 
   constructor(public af: AngularFireDatabase) {
     this.gameControlBuffor.MoveForeward = false;
@@ -124,22 +121,22 @@ export class BattlefieldComponent {
     if(!this.gameCanvasViewChild || !this.battefieldWrapperViewChild){
       return;
     }
-    this.gameCanvas = this.gameCanvasViewChild.nativeElement;
+    let gameCanvas = this.gameCanvasViewChild.nativeElement;
 
     this.updatePlayerWarMachinePosition();
     
-    let ctx=this.getCleanContext();
+    let ctx=this.getCleanContext(gameCanvas);
     ctx.save();
-    this.setViewport(this.gameCanvas, ctx);
+    this.setViewport(gameCanvas, ctx);
     this.drawBattleFieldBoundries(ctx);
     this.drawWarMachines(ctx);
     ctx.restore();
   }
 
-  getCleanContext(): CanvasRenderingContext2D{
-    let ctx=this.gameCanvas.getContext("2d");
+  getCleanContext(gameCanvas: HTMLCanvasElement): CanvasRenderingContext2D{
+    let ctx= gameCanvas.getContext("2d");
     //ctx.clearRect(0,0,this.settings.GAME_BATTLEFIELD_WIDTH, this.settings.GAME_BATTLEFIELD_HEIGHT);
-    ctx.clearRect(0, 0, this.gameCanvas.width+this.xTrans, this.gameCanvas.height+this.yTrans);
+    ctx.clearRect(0, 0, Math.max(this.settings.GAME_BATTLEFIELD_WIDTH, gameCanvas.width+this.xTrans), Math.max(this.settings.GAME_BATTLEFIELD_HEIGHT, gameCanvas.height+this.yTrans));
     return ctx;
   }
 
@@ -263,16 +260,16 @@ export class BattlefieldComponent {
     if(!this.gameCanvasViewChild || !this.battefieldWrapperViewChild){
       return;
     }
-    this.gameCanvas = this.gameCanvasViewChild.nativeElement;
+    let gameCanvas = this.gameCanvasViewChild.nativeElement;
     let battlefieldWrapper = this.battefieldWrapperViewChild.nativeElement;
-    this.gameCanvas.width = 0;
-    this.gameCanvas.height = 0;
+    gameCanvas.width = 0;
+    gameCanvas.height = 0;
 
     if(this.resizeTimer){
       clearTimeout(this.resizeTimer);
     }    
     this.resizeTimer = setTimeout(() => {    
-      this.fitGameCanvasToWrapper(this.gameCanvas, battlefieldWrapper);
+      this.fitGameCanvasToWrapper(gameCanvas, battlefieldWrapper);
     }, 50);
   }
 
