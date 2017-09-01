@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, HostListener, Injectable, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { AngularFireDatabase, FirebaseListObservable, FirebaseObjectObservable } from "angularfire2/database";
 import { UserService } from "../user.service";
-import { key_S, key_W, key_A, key_D, WAR_MACHINES_RES, SETTINGS_RES, key_Space } from "../global.constants";
+import { key_S, key_W, key_A, key_D, key_Space, WAR_MACHINES_RES, SETTINGS_RES, BULLETS_RES } from "../global.constants";
 
 @Component({
   selector: 'app-game',
@@ -21,7 +21,7 @@ export class GameComponent implements OnInit {
   selector: 'app-battlefield',
   template: `
   <div class="battefieldWrapper" #battefieldWrapper>
-    <button *ngIf="!playerWarMachineObservable" (click)="addNewWarMachine()">Game on!</button>
+    <button *ngIf="!playerWarMachineObservable" (click)="startGame()">Game on!</button>
     <canvas *ngIf="playerWarMachineObservable" class="gameCanvas" #gameCanvas></canvas>
   </div>
   `,
@@ -43,6 +43,9 @@ export class BattlefieldComponent {
 
   // bulletImage: HTMLImageElement;
   // warMachineImage: HTMLImageElement;
+
+  public bullets: IBullet[];
+  public bulletsObservable: FirebaseListObservable<IBullet[]>;
 
   public warMachines: IWarMachine[];
   public warMachinesObservable: FirebaseListObservable<IWarMachine[]>;
@@ -73,9 +76,15 @@ export class BattlefieldComponent {
     this.gameControlBuffor.MoveBack = false;
     this.gameControlBuffor.RotateLeft = false;
     this.gameControlBuffor.RotateRight = false;
+    this.gameControlBuffor.Shoot = false;
     this.warMachinesObservable = this.af.list(WAR_MACHINES_RES);
     this.warMachinesObservable.subscribe(newWarMachines => {
       this.warMachines = newWarMachines;
+    });
+
+    this.bulletsObservable = this.af.list(BULLETS_RES);
+    this.bulletsObservable.subscribe(allBullets => {
+      this.bullets = allBullets;
     });
 
 
@@ -105,6 +114,19 @@ export class BattlefieldComponent {
     });
   }
   
+  newBullet(): IBullet{
+    let userWarMachine = this.warMachine;
+
+    if(!this.bullets || !userWarMachine){
+      return;
+    }
+    return <IBullet>{ xpos: userWarMachine.xpos, ypos: userWarMachine.ypos, angle: userWarMachine.angle, ownerPlayerId: userWarMachine.playerId };
+  }
+
+  startGame(){
+    this.addNewWarMachine();  
+    this.onResize({});
+  }
 
   battleFieldClock: GameClock;
   timer: any;
@@ -118,15 +140,27 @@ export class BattlefieldComponent {
       angle: this.getRandon(0, 360),
       playerId: player.uid,
       playerName: player.displayName
-    }; 
+    };
     var createdKey = this.warMachinesObservable.push(this.warMachine).key;
 
     this.playerWarMachineObservable = this.af.object(WAR_MACHINES_RES + createdKey);
     this.playerWarMachineObservable.subscribe((value: IWarMachine) => {
       this.warMachine = value;
     });
-  
-    this.onResize({});
+  }
+
+  addOrUpdateBullets(bulletsToUpdate: IBullet[]){
+    if(this.bulletsObservable){
+      bulletsToUpdate.forEach(bullet =>  {
+        if(bullet.$key){
+          this.bulletsObservable.update(bullet.$key, bullet);
+        }
+        else{
+          this.bulletsObservable.push(bullet);
+        }
+
+      });
+    }
   }
 
   updateWarMachine(newDataWarMachine: IWarMachine){
@@ -141,6 +175,7 @@ export class BattlefieldComponent {
     }
     let gameCanvas = this.gameCanvasViewChild.nativeElement;
 
+    this.updateBulletsPosition();
     this.updatePlayerWarMachinePosition();
     
     let ctx=this.getCleanContext(gameCanvas);
@@ -148,6 +183,7 @@ export class BattlefieldComponent {
     this.setViewport(gameCanvas, ctx);
     this.drawBattleFieldBoundries(ctx);
     this.drawWarMachines(ctx);
+    this.drawBullets(ctx);
     ctx.restore();
   }
 
@@ -192,6 +228,25 @@ export class BattlefieldComponent {
     });
   }
 
+  drawBullets(ctx: CanvasRenderingContext2D){
+    if(!this.bullets){
+      return;
+    }
+
+    this.bullets.forEach(currentBullet => {      
+      //draw circle
+      ctx.beginPath();
+      ctx.arc(currentBullet.xpos, currentBullet.ypos, this.settings.GAME_BATTLEFIELD_BULLET_SIZE, 0, 2 * Math.PI, false);
+      ctx.fillStyle = 'rgba(34, 0, 204, 0.8)';
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(51, 129, 255, 0.8)';
+      ctx.stroke();
+    });
+
+
+  }
+
   setViewport(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     let biggerDimention = canvas.width > canvas.height ? canvas.width : canvas.height;
     biggerDimention *= 0.1;
@@ -220,6 +275,35 @@ export class BattlefieldComponent {
     }
 
     ctx.translate(-this.xTrans, -this.yTrans);
+  }
+
+  updateBulletsPosition(){ 
+    if(!this.bullets){
+      return;
+    }
+
+    let updatedBullets = [];
+    if(this.gameControlBuffor.Shoot){
+      updatedBullets.push(this.newBullet());
+    }
+
+
+    let userId = this.userService.getUserId();
+    let distance = this.battleFieldClock.ElapsedSeconds;
+
+    this.bullets.forEach(currentBullet => {
+
+      if(currentBullet.ownerPlayerId == userId){
+        let vector = Vector2d.getVectorFromDistanceAndAngle(distance * this.settings.GAME_MOVE_SPEED * 2, currentBullet.angle);
+
+        currentBullet.xpos += vector.x;
+        currentBullet.ypos += vector.y;
+
+        updatedBullets.push(currentBullet);
+      }
+    });
+
+    this.addOrUpdateBullets(updatedBullets);
   }
 
   updatePlayerWarMachinePosition() {
@@ -355,7 +439,6 @@ export class BattlefieldComponent {
     }
   }
 
-
   // @HostListener('window:mouseup', ['$event'])
   // mouseUp(event){
   // }
@@ -378,6 +461,19 @@ export interface IWarMachine{
   playerName: string;
 }
 
+export interface IBulletWrapper{  
+  $key: string;
+  bullets: IBullet[];
+  ownerPlayerId: string;  
+}
+
+export interface IBullet{
+  $key: string;
+  xpos: number;
+  ypos: number;
+  angle: number;
+  ownerPlayerId: string;
+}
 
 export class GameClock{
   public ElapsedSeconds : number;

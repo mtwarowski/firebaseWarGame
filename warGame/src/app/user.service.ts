@@ -26,8 +26,7 @@ constructor(public af: AngularFireDatabase, public afAuth: AngularFireAuth, priv
   }
 
   loginWithGoogle() {
-    return this.afAuth.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-    
+    return this.afAuth.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());    
   }
     
   logout() {
@@ -41,10 +40,6 @@ constructor(public af: AngularFireDatabase, public afAuth: AngularFireAuth, priv
   getUserData() : firebase.User {
     return this.currentUser;
   }
-
-  // getUserObjectsUrl() : string {    
-  //   return '/userData/' +  this.currentUser.uid;
-  // }
 
   getUserId() : string {    
     return this.currentUser.uid;

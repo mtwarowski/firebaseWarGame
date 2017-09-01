@@ -6,3 +6,4 @@ export const key_Space = 32;
 export const WAR_MACHINES_RES = "/warMachines/";
 export const SETTINGS_RES = "/settings/";
 export const SCORES_RES = "/scores/"; 
+export const BULLETS_RES = "/bullets/"; 
